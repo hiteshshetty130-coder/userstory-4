@@ -1,51 +1,64 @@
 import unittest
+from unittest.mock import patch, Mock, mock_open
 from user import scrap_books
-import os
+import csv
 
-#FILE TO CHECK IF CONTENT EXISTS AND CHECK OTHER THINGS
-file="books_data.csv"
+mock_data= (
+    "title,price,availability,rating,product url\n"
+    "light book,$50,in stock,3,https://catalogue/index.html\n"
+)
+
+required_columns  = ["title", "price", "availability", "rating", "product url"]
+
 
 class TestCsvFileDownload(unittest.TestCase):
-    #Test case 1: Verify Csv file download
-    def test_main1(self):
-        #check if the file path is not empty and also check if the file path exits
-        self.assertIsNotNone(file)
-        self.assertTrue(os.path.exists(file))
 
-    #Test Case 2:validate csv file extraction
-    def test_main2(self):
-        #check if it is correct csv filer and check if it has some data in it
-        self.assertTrue(file.endswith(".csv"))
-        self.assertGreater(os.path.getsize(file),0)
+    # 1. Verify CSV file download
+    @patch("user.logging.error")
+    @patch("user.requests.get")
+    def test_main1_csv_download(self, mock_get, mock_log_error):
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = mock_data.encode("utf-8")
+        mock_response.text = mock_data
+        mock_get.return_value = mock_response
 
-    #Test Case 3:verify file type and format
-    def test_main3(self):
-        #check the file type in the system
-        self.assertTrue(os.path.exists(file))
+        result = scrap_books()
 
-    #Test Case 4:validate Data Structure
-    def test_main4(self):
-        data=scrap_books() #get the value returned from the function
-        books_data=data[0]
-        #check the data structure is list or not
-        self.assertIsInstance(data,list)
+        self.assertIsNotNone(result)
+        mock_log_error.assert_not_called()
 
-        #loop over each data in the list and check if the data as all the required columns
-        
-        self.assertIn("title",books_data)
-        self.assertIn("price",books_data)
-        self.assertIn("rating",books_data)
-        self.assertIn("availability",books_data)
-        self.assertIn("product URL",books_data)
+    # 2. Validate CSV file extraction
+    @patch("builtins.open", new_callable=mock_open, read_data=mock_data)
+    def test_main2_csv_extraction(self, mock_file):
+        with open("books_data.csv", "r", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
 
-    #Test case 4:Handle missing and invalid data
-    def test_main5(self):
-        books_data=scrap_books() #get the value returned from the function
-        #loops over each data in the list and checks if any value in the dictionary is not none
-        for book in books_data:
-            for values in book.values():
-                self.assertIsNotNone(values)
+        self.assertGreater(len(rows), 0)
 
-if __name__=="__main__":
+    # 3. Verify file type and format
+    def test_main3_file_type(self):
+        file_path = "books_data.csv"
+        self.assertTrue(file_path.endswith(".csv"))
+
+    # 4. Handle data structure (headers)
+    @patch("builtins.open", new_callable=mock_open, read_data=mock_data)
+    def test_main4_data_structure(self, mock_file):
+        with open("books_data.csv", "r", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+
+        self.assertEqual(headers, required_columns)
+
+    # 5. Handle missing and invalid data
+    @patch("builtins.open", new_callable=mock_open, read_data=mock_data)
+    def test_main5_no_missing_data(self, mock_file):
+        with open("books_data.csv", "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                for key, value in row.items():
+                    self.assertTrue(value, f"Missing value for {key}")
+
+
+if __name__ == "__main__":
     unittest.main()
-

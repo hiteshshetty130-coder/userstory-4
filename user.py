@@ -86,7 +86,7 @@ def scrap_books():
         logging.error(f"Unexcepted error - {e}")
 
     #return the data for testing
-    return books_data
+    return books_data,"books_data.csv"
 
 #main function to log the books data which are scraped
 def main():
